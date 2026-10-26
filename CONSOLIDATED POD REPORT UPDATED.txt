@@ -1,0 +1,544 @@
+﻿Project SENTINEL - Consolidated POD Report 
+
+Project SENTINEL aims to develop a domain-specific fraud intelligence system for 
+PayVista Payments Pvt. Ltd. The proposed system, SENTINEL-LM, must analyse 
+transactions, estimate fraud probability, return an ALLOW, REVIEW or BLOCK decision, 
+and provide a plain-language explanation.  
+
+The supplied Supabase database kit contains synthetic development data organised into 
+14 relational tables, one model_features view and 43 training-related files in the 
+sentinel-data Storage bucket. It supports data exploration, feature validation, model 
+development and testing.  
+
+1.​ Dataset Overview 
+1.1.​ Purpose and structure 
+
+The dataset supports the development and evaluation of fraud detection, risk scoring, 
+decision-making and explanation generation. Its relational structure separates raw 
+transactions, fraud labels, engineered features, payment outcomes and supporting 
+documents. 
+
+Dataset/table Records Purpose 
+
+customers 2,500 Customer profiles 
+
+merchants 200 Merchant identities, categories and locations 
+
+devices 10,120 Device inventory 
+
+transactions 110,000 Transaction inputs 
+
+payment_outcom 110,000 Payment processing outcomes 
+es 
+
+labels 110,000 Fraud labels and label timing 
+
+features 110,000 Engineered fraud indicators 
+
+legacy_cases 200 Historical case examples 
+
+documents 5,256 Investigation and reference documents 
+
+gold_explanation 8,500 Reviewed or candidate explanation examples, subject 
+s to status verification 
+
+preference_pairs 5,000 Preferred and rejected explanation pairs 
+
+threshold_sets 1 Decision threshold configuration 
+
+hard_rules 2 Explicit rule-based controls 
+
+list_entries 24 Allow/block or other configured entity lists 
+
+
+
+The 14 tables contain 359,208 table rows in total, counting each table separately. This is 
+not the number of unique transactions because several tables refer to the same 
+transaction. There are 110,000 transaction records, with corresponding payment 
+outcomes, labels and feature records. 
+
+The model_features view combines transaction information, engineered features, 
+customer attributes and labels. The exact number of columns in this view and the 
+individual tables should be verified against the live schema or data dictionary. 
+
+1.2.​ Production versus development data 
+
+The client requirements describe a separate production dataset of approximately 12 
+million transactions across 14 months, January 2025 to February 2026, with a fraud rate 
+of approximately 0.6%. The Supabase kit contains 110,000 synthetic transactions and is 
+intended for classroom development and testing. 
+
+2.​ Data Dictionary 
+
+The following dictionary covers the principal transaction fields, engineered features, 
+and supporting database attributes. Examples are illustrative. 
+
+2.1.​ Transaction and customer attributes 
+
+Attribute Data type Business meaning Example 
+
+transaction_id TEXT Unique transaction TX98231 
+reference 
+
+customer_id TEXT Pseudonymous C_7f31a9 
+customer identifier 
+
+merchant_id TEXT Merchant reference M_0042 
+
+device_id TEXT, nullable Device used for D_44be20 
+payment 
+
+amount_paise BIGINT Transaction amount 5000000 = 
+in paise ₹50,000 
+
+transaction_amount NUMERIC(14,2) Transaction amount 50000.00 
+in rupees 
+
+payment_channel TEXT Payment method or UPI 
+channel 
+
+merchant_category TEXT Merchant business electronics 
+category 
+
+transaction_time TIMESTAMPTZ Transaction 2025-11-14T03:
+timestamp 12:44Z 
+
+
+
+customer_age INTEGER Customer age in 27 
+years 
+
+customer_location JSONB, nullable Customer location {"city":"Pune"} 
+details 
+
+merchant_location JSONB Merchant location {"city":"Delhi"} 
+details 
+
+account_age INTEGER Account age in days 6 
+
+previous_transactions INTEGER Customer 14 
+transaction count in 
+the preceding 30 
+days 
+
+average_transaction_val NUMERIC(14,2), Customer’s average 2350.00 
+ue nullable transaction value 
+
+over the preceding 
+90 days 
+
+failed_transactions INTEGER Failed attempts in 4 
+the preceding 24 
+hours 
+
+split TEXT Dataset partition for train 
+controlled model 
+development 
+
+is_synthetic BOOLEAN Indicates synthetic true 
+rather than real data 
+
+The customers table also contains created_at (TIMESTAMPTZ, account creation time), 
+home_city (TEXT), region (TEXT) and is_synthetic (BOOLEAN). The merchants table 
+contains synthetic_name (TEXT), merchant_category (TEXT), merchant_location 
+(JSONB) and is_synthetic. The devices table contains device_kind (TEXT) and 
+is_synthetic, in addition to device_id. 
+
+2.2.​ Labels and payment outcomes 
+
+Attribute Data type Business Example 
+meaning 
+
+fraud_label SMALLINT Confirmed target: 1 
+1 = fraud, 0 = 
+genuine 
+
+label_source TEXT Source of the investigator 
+fraud verdict 
+
+
+
+label_available_at TIMESTAMPTZ Time the label 2026-01-15T00:0
+became eligible 0:00Z 
+for use 
+
+eligible_at_next_split_start BOOLEAN Indicates label true 
+timing eligibility 
+for a later split 
+
+outcome_time TIMESTAMPTZ Time the payment Timestamp 
+outcome was 
+recorded 
+
+status TEXT Payment success 
+processing 
+outcome 
+
+failure_code TEXT, nullable Reason for insufficient_funds 
+payment failure 
+
+labels keeps the fraud target separate from the raw transaction input. This is important 
+because a live scoring model must not receive the answer it is expected to predict. 
+Payment success or failure must also not automatically be treated as proof of fraud. 
+
+2.3.​ Engineered features 
+
+Attribute Data type Business Example 
+meaning 
+
+amount_to_avg_ratio DOUBLE Current amount 21.28 
+PRECISION divided by 
+
+average 
+transaction value 
+
+is_new_device BOOLEAN, Device not seen true 
+nullable for the customer 
+
+in the previous 
+90 days 
+
+customer_merchant_distance_k DOUBLE Geographic 1,170.5 
+m PRECISION, distance 
+
+nullable between 
+customer and 
+merchant 
+
+is_new_city BOOLEAN, Transaction city true 
+nullable is new relative to 
+
+the relevant 
+history 
+
+hour_of_day INTEGER Transaction hour 3 
+
+
+
+is_night BOOLEAN Whether the true 
+transaction 
+occurs from 
+midnight to 5 
+a.m. 
+
+has_recent_failures BOOLEAN Whether at least true 
+three recent 
+failures occurred 
+
+is_new_account BOOLEAN Whether account true 
+age is below 30 
+days 
+
+txn_count_last_1h INTEGER Transactions in 5 
+the preceding 
+hour 
+
+txn_amount_last_24h_paise BIGINT Transaction 7500000 
+amount 
+accumulated 
+over the 
+preceding 24 
+hours, in paise 
+
+distinct_customers_per_device_ INTEGER, Number of 4 
+7d nullable distinct 
+
+customers 
+associated with a 
+device over 
+seven days 
+
+combined_risk_flags INTEGER Count of selected 4 
+risk flags 
+
+mcc_target_encoded_rate DOUBLE Training-derived 0.012 
+PRECISION merchant-catego
+
+ry fraud-rate 
+encoding 
+
+mcc_encoding_as_of TIMESTAMPTZ Timestamp Timestamp 
+associated with 
+the category 
+encoding 
+
+mcc_encoding_count INTEGER Number of 250 
+observations 
+supporting the 
+encoding 
+
+
+
+missing_customer_location BOOLEAN Indicates false 
+unavailable 
+customer 
+location 
+
+missing_device BOOLEAN Indicates false 
+unavailable 
+device 
+information 
+
+cold_start BOOLEAN Indicates false 
+insufficient 
+history for some 
+features 
+
+reason_codes JSONB Structured ["NEW_DEVI
+explanation or CE"] 
+risk-reason 
+indicators 
+
+feature_as_of TIMESTAMPTZ Time at which Timestamp 
+feature values 
+were calculated 
+
+feature_version TEXT Feature logic v1.0 
+version 
+
+The features table also stores transaction_id (TEXT) as its transaction reference. 
+Nullability is important: an unavailable feature should not automatically be interpreted 
+as a low-risk value. 
+
+2.4.​ Supporting tables and attributes 
+
+The remaining schema supports traceability, training and operational controls. 
+
+Table Attributes and meaning 
+
+legacy_cases legacy_case_id (TEXT), customer_id (TEXT), transaction_time 
+(TIMESTAMPTZ), closed_at (TIMESTAMPTZ), amount_paise 
+(BIGINT), payment_channel (TEXT), fraud_label (SMALLINT), 
+evidence (JSONB), is_synthetic (BOOLEAN). Stores case evidence 
+and outcomes. 
+
+documents document_id (TEXT), kind (TEXT), title (TEXT), transaction_id 
+(TEXT, nullable), legacy_case_id (TEXT, nullable), split (TEXT), 
+published_at (TIMESTAMPTZ), content (TEXT), content_sha256 
+(TEXT), template_family (TEXT), cpt_eligible (BOOLEAN), 
+review_status (TEXT), storage_path (TEXT), record_in_shard 
+
+
+
+(INTEGER), metadata (JSONB), is_synthetic (BOOLEAN). Supports 
+corpus management and provenance. 
+
+gold_explanation example_id (TEXT), transaction_id (TEXT), split (TEXT), prompt 
+s (TEXT), target (JSONB), fraud_label (SMALLINT), review_status 
+
+(TEXT), is_synthetic (BOOLEAN). Stores explanation prompts and 
+targets. 
+
+preference_pairs pair_id (TEXT), transaction_id (TEXT), split (TEXT), prompt 
+(TEXT), chosen (JSONB), rejected (JSONB), rejection_reason 
+(TEXT), review_status (TEXT), is_synthetic (BOOLEAN). Supports 
+preference optimisation. 
+
+threshold_sets threshold_id (TEXT), version (INTEGER), mcc_group (TEXT, 
+nullable), medium_from, high_from, critical_from (NUMERIC(4,3)), 
+status (TEXT), is_synthetic (BOOLEAN). Defines versioned risk 
+thresholds. 
+
+hard_rules rule_id (TEXT), code (TEXT), expression (JSONB), action (TEXT), 
+priority (INTEGER), enabled (BOOLEAN), is_synthetic 
+(BOOLEAN). Stores explicit decision rules. 
+
+list_entries entry_id (TEXT), list_type (TEXT), entity_id (TEXT), effective_from 
+(TIMESTAMPTZ), reason (TEXT), is_synthetic (BOOLEAN). 
+Records time-effective entity-list entries. 
+
+3.​ Business Mapping to Client Requirements 
+
+Client requirement Dataset support and implementation 
+
+Detect card and UPI Transaction amount, channel, time, customer history, 
+fraud merchant category, device and location features 
+
+Return a fraud fraud_label provides the supervised target; features supplies 
+probability model inputs 
+
+Return ALLOW / Model score combined with validated thresholds and 
+REVIEW / BLOCK high-priority hard rules 
+
+Explain the decision documents, legacy_cases, gold_explanations, preference_pairs 
+and reason_codes 
+
+Train on PayVista Use authorised production data and approved corpora inside 
+data PayVista’s AWS environment; the supplied kit supports 
+
+development only 
+
+Avoid future-data Respect split, label_available_at, feature_as_of and document 
+leakage eligibility 
+
+
+
+4.​ Data Quality Observations 
+
+The client’s production specification identifies approximately 3% missing 
+customer-location values and some older UPI transactions with missing device IDs. Rare 
+transactions exceed ₹10 lakh, and fraud represents approximately 0.6% of the 
+production dataset—roughly one fraud case per 167 transactions. These are expected 
+production characteristics, not verified findings about the synthetic Supabase data. 
+
+Required checks include: 
+
+●​ Missing values: quantify nulls in locations, device IDs and average transaction 
+values; verify missingness flags. 
+
+●​ Duplicates: check uniqueness of primary keys and duplicate document content.
+
+4. Data Quality, Leakage and Privacy
+These checks were run against the Supabase development dataset. The results describe the supplied synthetic data and should not be treated as evidence about PayVista’s production data. model_features is a view of model-ready data, so its results overlap with the underlying tables and are not additional records.
+
+4.1 Duplicate and relationship checks
+The primary-key and declared unique-key checks returned no rows: no duplicate key values were detected in the checked keys. The orphan-row checks for declared foreign keys also returned no rows: no orphan references were detected.
+
+The database declares relationships from transactions to customers, devices and merchants; from features, labels, payment outcomes, gold explanations and preference pairs to transactions; from documents to transactions and legacy cases; and from legacy cases to customers. The corresponding checks found no non-null foreign-key values without a matching parent record. Nullable references in documents are not orphans, but their intended meaning should be confirmed separately.
+
+4.2 Missing values and blank text
+Table	Attribute	Missing rows	Missing
+transactions	customer_location	3,257 / 110,000	2.96%
+transactions	average_transaction_value	2,829 / 110,000	2.57%
+transactions	device_id	1,138 / 110,000	1.03%
+features	customer_merchant_distance_km	3,257 / 110,000	2.96%
+features	is_new_city	3,257 / 110,000	2.96%
+features	amount_to_avg_ratio	2,829 / 110,000	2.57%
+features	is_new_device	1,138 / 110,000	1.03%
+features	distinct_customers_per_device_7d	1,138 / 110,000	1.03%
+payment_outcomes	failure_code	97,985 / 110,000	89.08%
+documents	legacy_case_id	4,319 / 5,256	82.17%
+documents	transaction_id	2,442 / 5,256	46.46%
+threshold_sets	mcc_group	1 / 1	100.00%
+No blank text values were found in the checked columns. The missing counts for transaction inputs and their corresponding features match, which is consistent with feature values depending on those inputs. Missing failure_code values may be expected for successful payments; verify this against payment status. Document references may be nullable for general reference documents, but confirm that each document type’s rules allow the observed missing references. The threshold_sets.mcc_group result is one missing value in a one-row table; confirm whether a null group represents a global threshold configuration.
+
+4.3 Numeric distributions and interpretation of statistical flags
+The IQR rule flags values beyond the range from 
+Q
+1
+−
+1.5
+×
+I
+Q
+R
+Q 
+1
+​
+ −1.5×IQR to 
+Q
+3
++
+1.5
+×
+I
+Q
+R
+Q 
+3
+​
+ +1.5×IQR. These flags identify statistical extremes; they do not establish that a value is incorrect. The counts below are from the supplied query results. Equivalent fields in transactions and model_features describe overlapping data and should not be counted as separate findings.
+
+Attribute	Observed distribution	IQR flags	Business interpretation
+transactions.transaction_amount	Median ₹1,250.34; maximum ₹7,995,933.05	10,344 / 110,000 (9.40%)	Strong right skew is plausible for transaction amounts. Validate unusually large values against source records, currency units and approved transaction limits; do not automatically remove them.
+transactions.average_transaction_value	Median ₹1,660.87; maximum ₹3,998,702.18	8,652 / 107,171 (8.07%)	Extreme historical averages can affect derived ratios. Check the aggregation window and source transactions, especially for customers with little history.
+features.amount_to_avg_ratio	Median 0.7467; maximum 30,211.6359	8,360 / 107,171 (7.80%)	Large ratios may reflect a high current amount or a very small historical average. Inspect both inputs and the feature’s denominator handling before deciding whether values are invalid.
+transactions.account_age	Median 740 days; maximum 2,242 days	5,601 / 110,000 (5.09%)	Older accounts are not inherently anomalous. Validate against account creation dates and confirm the intended unit and calculation.
+features.txn_amount_last_24h_paise	Median ₹0; maximum ₹8,007,534.01	14,570 / 110,000 (13.25%)	The zero-heavy distribution is consistent with many records having no prior transaction amount in the window. High totals may reflect transaction bursts; validate the lookback window and aggregation.
+features.txn_count_last_1h	Median 0; maximum 10	19,443 / 110,000 (17.68%)	The flags are counts above the IQR fence, not invalid values. Higher counts may be useful transaction-velocity signals; check the one-hour window and event ordering.
+transactions.failed_transactions	Median 0; maximum 8	16,761 / 110,000 (15.24%)	Because most values are zero, the IQR fence is also zero. Positive counts are therefore flagged by a mechanical rule; they may be valid risk indicators. Verify the count’s time window and whether it includes only prior failures.
+features.combined_risk_flags	Median 1; range 0–4	38,577 / 110,000 (35.07%)	This is a bounded, discrete count. The IQR fence is 1, so values above 1 are flagged even though 0–4 may be valid by design. Do not treat these flags as data errors.
+features.mcc_target_encoded_rate	Median 0.0012685; maximum 0.02580214	22,277 / 110,000 (20.25%)	Higher category rates may reflect differences between merchant-category groups. Review group sample sizes and smoothing; importantly, verify that the encoding was created without using validation, test or future labels.
+features.distinct_customers_per_device_7d	Median 1; maximum 3	53 / 108,862 (0.05%)	The few flagged values are small counts and may be valid shared-device activity. Confirm the seven-day window and intended treatment of shared devices.
+transactions.previous_transactions	Median 3; maximum 35	2,530 / 110,000 (2.30%)	Higher counts may simply identify established customers. Confirm the count’s time boundary and ensure it includes only transactions preceding the scored transaction.
+Other checked fields had ranges consistent with their apparent definitions: customer ages were 18–80 with no IQR flags; hour_of_day ranged from 0–23 with no flags; customer_merchant_distance_km ranged from 0–2,428.81 km with no flags; and distinct_customers_per_device_7d ranged from 0–3. These results do not rule out errors that fall within the observed ranges.
+
+IQR flags on binary fraud labels are not useful as outlier checks. The labels.fraud_label results show 660 fraud labels among 110,000 rows (0.60%); the 660 flags are the positive class, not erroneous values. Similarly, the 415 positive labels among 8,500 gold_explanations records are a class count, not a data-quality finding. The 49 positive labels among 200 legacy_cases records should also be reported as class distribution rather than outliers.
+
+4.4 Leakage controls
+Several fields require explicit controls before model training:
+
+model_features.fraud_label is the target and must not be used as a predictor.
+mcc_target_encoded_rate is derived from fraud labels. Generate it using training-only, out-of-fold or time-aware encoding. Do not calculate it using validation, test or future labels.
+Transaction history features such as previous_transactions, failed_transactions, txn_count_last_1h and txn_amount_last_24h_paise must use only events available before the transaction being scored.
+payment_outcomes fields and investigation or explanation data may be recorded after a transaction decision. Exclude them from a real-time prediction unless their availability at scoring time is established.
+Split training and evaluation data by time, and where appropriate by customer, to reduce leakage from related transactions appearing in both sets.
+These are modeling safeguards to verify; the query results alone do not prove that leakage occurred.
+
+4.5 Privacy considerations
+The kit is described as synthetic, so these results do not establish that it contains real customer information. However, fields such as customer identifiers, age, location, device identifiers, transaction histories and investigation documents are sensitive in a production setting. Use least-privilege access, restrict access to raw identifiers and documents, apply retention limits, and use de-identified or aggregated data for analysis where possible. Avoid including customer-level records or document contents in the report. Reassess privacy and access controls before using any real PayVista data.
+
+
+
+5.​ AI/ML Opportunities
+
+First of all, preprocessing will include removing duplicate records, handling missing values, validating transaction amounts and timestamps, redacting PII from text, and encoding categorical variables. The target variable is fraud_label (0 = genuine, 1 = fraud). Engineered features include amount-to-average ratio, new-device indicators, customer–merchant distance, transaction velocity, and recent failures. ML models can be used with structured transaction data, while LLM can learn from approved text corpora and reviewed explanations. Batch processing can support historical training and periodic updates; real-time processing can calculate transaction features and return fraud scores and decisions. 
+
+1.​ Supervised fraud classification: Train ML model using transaction and 
+engineered features. Handle class imbalance with suitable class weighting or 
+sampling applied only to training data. 
+
+2.​ Risk scoring and decisioning: Calibrate probabilities and evaluate precision, 
+recall, PR-AUC, false declines and fraud loss. Choose ALLOW/REVIEW/BLOCK 
+thresholds using business costs and review capacity. 
+
+3.​ Domain-adapted language model: Use approved investigator notes, dispute 
+narratives, playbooks and reference documents for continued pretraining where 
+appropriate. Use reviewed prompts and gold explanations for supervised 
+fine-tuning. 
+
+4.​ Grounded explanations: Generate concise reasons based on actual features and 
+approved evidence; prohibit invented evidence and sensitive-data reproduction. 
+
+6.​ Discussion Notes: Observations, Questions and Decisions 
+
+Key observations 
+
+●​ The dataset separates transactions, labels and features, supporting safer model 
+development. 
+
+●​ Transaction context is important: amount anomalies, new devices, new locations, 
+recent failures and transaction velocity may jointly indicate risk. 
+
+●​ Fraud labels may become available well after authorisation; label timing must be 
+respected. 
+
+Questions to resolve 
+
+●​ Which document types are eligible for continued pretraining and which are 
+approved explanation targets? 
+
+●​ How will model drift, threshold changes and human overrides be monitored? 
+
+Proposed decisions and learnings 
+
+●​ Treat the supplied Supabase kit as synthetic development data. 
+
+
+
+●​ Preserve train, validation and holdout boundaries. 
+●​ Validate data quality, explanation faithfulness, calibration, privacy and 
+
+end-to-end latency before deployment. 
+
+7.​ Individual POD Contributions 
+
+POD member / role Contribution to record 
+
+Member 1-Poorva Explained what type of files we have in structure and 
+Wadkar unstructured dataset, then columns, their data types, table 
+
+schema and keys. 
+
+Member 2 - Chouda Explored the supabase schema, transaction fields present, 
+Reddy table relationships, keys, data types. 
+
+Member 3 - Rajesh S Explained the business problem 
+
+Member 4 - Saurabh Explored the null values, columns which can be helpful for 
+Naik detecting fraudulent transactions like missing location or 
+
+average traction amount details. 
+
+All POD members Discussed the nature of data, why the particular 
+transaction might be fraudulent.
