@@ -5,6 +5,9 @@
 
 # Python virtual environment
 sentinelenv/
+.venv/
+venv/
+env/
 
 # Python cache files
 __pycache__/
