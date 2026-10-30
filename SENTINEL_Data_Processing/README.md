@@ -99,3 +99,23 @@ All features are calculated using information available before each transaction 
 - The virtual environment should not be committed to GitHub.
 - The `.gitignore` file excludes sensitive and unnecessary files.
 
+## Project Screenshots
+
+### 1. Supabase Data Extraction Summary
+![Supabase Extraction](screenshots/supabase_table_extraction_summary.png)
+
+### 2. Customers Data Quality Report
+![Customers Quality](screenshots/customers_data_quality_report.png)
+
+### 3. Transactions Outlier and Split Analysis
+![Transactions Analysis](screenshots/transactions_outlier_and_split_analysis.png)
+
+### 4. Locally Engineered Transaction Features
+![Derived Features](screenshots/locally_engineered_transaction_features.png)
+
+### 5. Transaction Reason Code Assignment
+![Reason Codes](screenshots/transaction_reason_code_assignment.png)
+
+### 6. Feature Match Rate Comparison
+![Feature Match Rate](screenshots/feature_match_rate_comparison.png)
+
